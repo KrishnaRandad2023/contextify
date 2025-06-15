@@ -67,6 +67,10 @@ app.post("/extract", async (req: Request, res: Response): Promise<void> => {
     res.status(500).json({ error: "❌ Failed to extract chat content." });
   }
 });
+app.get("/", (req, res) => {
+  res.send("✅ Scraper backend is running.");
+});
+
 
 app.listen(PORT, () => {
   console.log(`🚀 Scraper backend running on http://localhost:${PORT}`);
