@@ -30,7 +30,7 @@ export default function Home() {
       a.href = url;
       a.download = "summary.json";
       a.click();
-    } catch (err) {
+    } catch (_err) {
       alert("Invalid JSON. Cannot download.");
     }
   };
@@ -97,7 +97,7 @@ export default function Home() {
     } else {
       throw new Error("No content extracted");
     }
-  } catch (error) {
+  } catch (_error) {
     setSummary("❌ Failed to extract chat from URL. Please check the link.");
     setLoading(false);
     return;
