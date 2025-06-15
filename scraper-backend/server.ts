@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-app.get("/", (req, res) => {
+app.get("/", (_req, res) => {
   res.send("✅ Scraper backend is running.");
 });
 
@@ -23,17 +23,24 @@ app.post("/extract", async (req: Request, res: Response): Promise<void> => {
 
   try {
     const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+  headless: true,
+  args: ['--no-sandbox', '--disable-setuid-sandbox']
+});
 
     const page = await browser.newPage();
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
+
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
+
+    // ✅ Buffer to allow dynamic content to fully render
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    console.log("🌐 Navigated to URL:", url);
 
     let chat = "";
 
     if (url.includes("chat.openai.com")) {
+      // ✅ Wait for ChatGPT message blocks
       await page.waitForSelector('[data-message-author-role]', { timeout: 60000 });
+
       chat = await page.$$eval('[data-message-author-role]', (nodes) =>
         nodes.map((node) => {
           const role = node.getAttribute("data-message-author-role") || "user";
