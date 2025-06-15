@@ -38,19 +38,26 @@ app.post("/extract", async (req: Request, res: Response): Promise<void> => {
     let chat = "";
 
     if (url.includes("chat.openai.com")) {
-      // ✅ Wait for ChatGPT message blocks
-      await page.waitForSelector('[data-message-author-role]', { timeout: 60000 });
+  try {
+    await page.waitForSelector('[data-message-author-role]', { timeout: 60000 });
+    chat = await page.$$eval('[data-message-author-role]', (nodes) =>
+      nodes.map((node) => {
+        const role = node.getAttribute("data-message-author-role") || "user";
+        const text = node.textContent?.trim() || "";
+        return `${role.toUpperCase()}: ${text}`;
+      }).join("\n\n")
+    );
 
-      chat = await page.$$eval('[data-message-author-role]', (nodes) =>
-        nodes.map((node) => {
-          const role = node.getAttribute("data-message-author-role") || "user";
-          const text = node.textContent?.trim() || "";
-          return `${role.toUpperCase()}: ${text}`;
-        }).join("\n\n")
-      );
-    } else {
-      chat = "⚠️ Only ChatGPT share links are currently supported.";
+    if (!chat || chat.trim().length < 10) {
+      chat = "⚠️ Could not extract content from the ChatGPT share link. Structure may have changed.";
     }
+  } catch (err) {
+    console.error("❌ Failed to extract from ChatGPT link:", err);
+    chat = "⚠️ Failed to parse ChatGPT share page. Please ensure the link is valid and public.";
+  }
+} else {
+  chat = "⚠️ Only ChatGPT share links are currently supported.";
+}
 
     await browser.close();
     res.json({ content: chat });
