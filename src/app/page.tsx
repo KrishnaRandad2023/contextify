@@ -106,15 +106,16 @@
 
   try {
     const response = await fetch("https://contextify-backend.onrender.com/summarize", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        text: finalChatText,
-        type: summaryType
-      })
-    });
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    chatText: finalChatText,
+    summaryType: summaryType
+  })
+});
+
 
     const data = await response.json();
     setSummary(data.summary);
