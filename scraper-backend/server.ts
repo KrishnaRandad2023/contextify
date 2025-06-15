@@ -23,41 +23,34 @@ app.post("/extract", async (req: Request, res: Response): Promise<void> => {
 
   try {
     const browser = await puppeteer.launch({
-  headless: true,
-  args: ['--no-sandbox', '--disable-setuid-sandbox']
-});
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    });
 
     const page = await browser.newPage();
-
     await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
 
-    // ✅ Buffer to allow dynamic content to fully render
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    console.log("🌐 Navigated to URL:", url);
+    // Wait for main content to load
+    await page.waitForSelector("main", { timeout: 15000 });
 
     let chat = "";
 
     if (url.includes("chat.openai.com")) {
-  try {
-    await page.waitForSelector('[data-message-author-role]', { timeout: 60000 });
-    chat = await page.$$eval('[data-message-author-role]', (nodes) =>
-      nodes.map((node) => {
-        const role = node.getAttribute("data-message-author-role") || "user";
-        const text = node.textContent?.trim() || "";
-        return `${role.toUpperCase()}: ${text}`;
-      }).join("\n\n")
-    );
+      try {
+        const mainText = await page.$eval("main", (el) => el.innerText.trim());
 
-    if (!chat || chat.trim().length < 10) {
-      chat = "⚠️ Could not extract content from the ChatGPT share link. Structure may have changed.";
+        if (!mainText || mainText.length < 20) {
+          throw new Error("Extracted text too short or missing.");
+        }
+
+        chat = mainText;
+      } catch (err) {
+        console.error("❌ Error scraping ChatGPT shared page:", err);
+        chat = "⚠️ Could not extract content from the ChatGPT share link.";
+      }
+    } else {
+      chat = "⚠️ Only ChatGPT share links are currently supported.";
     }
-  } catch (err) {
-    console.error("❌ Failed to extract from ChatGPT link:", err);
-    chat = "⚠️ Failed to parse ChatGPT share page. Please ensure the link is valid and public.";
-  }
-} else {
-  chat = "⚠️ Only ChatGPT share links are currently supported.";
-}
 
     await browser.close();
     res.json({ content: chat });
