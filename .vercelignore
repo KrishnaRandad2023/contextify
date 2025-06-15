@@ -1,29 +1,21 @@
-# Node modules
+# Ignore local node modules
 node_modules/
 scraper-backend/node_modules/
 
-# Build outputs
+# Ignore build outputs
 .next/
 out/
 dist/
 scraper-backend/dist/
 
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Environment files
+# Ignore environment config
 .env
 .env.local
 .env.*.local
 
+# Logs
+*.log
+
 # System files
 .DS_Store
 Thumbs.db
-
-# Vercel
-.vercel
-
-# Misc
-*.log
