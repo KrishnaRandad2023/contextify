@@ -1,44 +1,23 @@
-# Use official Node image
+# Use a full Node base image
 FROM node:18
 
-# Set working directory
+# Set working folder in container
 WORKDIR /app
 
-# Copy only backend package files first
-COPY package.json package-lock.json ./
-
-# Install dependencies for scraper-backend
-RUN npm install
-
-# Copy rest of backend code
-COPY . .
-
-# Compile TypeScript
-RUN npm run build
-# Use full Node.js image with Debian for Playwright compatibility
-FROM mcr.microsoft.com/playwright:v1.40.0-jammy
-
-# Set working directory
-WORKDIR /app
-
-# Copy package files and install dependencies
+# Copy only package files first (faster install if no change)
 COPY package*.json ./
+
+# Install all dependencies
 RUN npm install
 
-# Copy rest of the source
+# Copy remaining source files
 COPY . .
 
-# Build TypeScript
+# Build TypeScript to JavaScript
 RUN npm run build
 
-# Expose backend port
+# Let container know it will use port 3001
 EXPOSE 3001
 
-# Start the compiled server
-CMD ["node", "dist/server.js"]
-
-# Expose API port
-EXPOSE 3001
-
-# Start server
+# Start the server using compiled JS
 CMD ["node", "dist/server.js"]
