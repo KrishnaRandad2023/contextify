@@ -1,21 +1,23 @@
-# Use Node.js image
+# Use official Node.js 18 image
 FROM node:18
 
-# Create app directory
+# Set working directory
 WORKDIR /app
 
-# Copy package files and install dependencies
+# Copy only package files to install dependencies first (cache-friendly)
 COPY package*.json ./
+
+# Install dependencies (includes TypeScript in devDependencies)
 RUN npm install
 
-# Copy all files
+# Copy remaining files
 COPY . .
 
-# Build TypeScript
+# Compile TypeScript (uses local tsc)
 RUN npx tsc
 
-# Expose port
+# Expose the port used by the app
 EXPOSE 3001
 
-# Run server
+# Start the server
 CMD ["node", "dist/server.js"]
