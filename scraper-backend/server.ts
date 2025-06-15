@@ -1,6 +1,6 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
-import { chromium } from "playwright";
+import puppeteer from "puppeteer";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -8,9 +8,13 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+app.get("/", (req, res) => {
+  res.send("✅ Scraper backend is running.");
+});
+
 app.post("/extract", async (req: Request, res: Response): Promise<void> => {
   const { url } = req.body;
-  console.log("📩 Received body:", req.body);
+  console.log("📩 Received URL:", url);
 
   if (!url || !url.startsWith("http")) {
     res.status(400).json({ error: "❌ Invalid or unsupported chat link." });
@@ -18,7 +22,11 @@ app.post("/extract", async (req: Request, res: Response): Promise<void> => {
   }
 
   try {
-    const browser = await chromium.launch({ headless: true });
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
 
@@ -33,44 +41,18 @@ app.post("/extract", async (req: Request, res: Response): Promise<void> => {
           return `${role.toUpperCase()}: ${text}`;
         }).join("\n\n")
       );
-
-    } else if (url.includes("poe.com")) {
-      await page.waitForSelector('[class*="Message"]', { timeout: 60000 });
-      chat = await page.$$eval('[class*="Message"]', (nodes) =>
-        nodes.map((node) => node.textContent?.trim() || "")
-             .filter(Boolean)
-             .join("\n\n")
-      );
-
-    } else if (url.includes("claude.ai")) {
-      await page.waitForSelector('main [class*="Message"]', { timeout: 60000 });
-      chat = await page.$$eval('main [class*="Message"]', (nodes) =>
-        nodes.map((node) => node.textContent?.trim() || "")
-             .filter(Boolean)
-             .join("\n\n")
-      );
-
-    } else if (url.includes("gemini.google.com")) {
-      await page.waitForSelector("cib-shared", { timeout: 60000 });
-      const html = await page.content();
-      chat = html.slice(0, 3000) + "\n\n⚠️ Google Gemini fallback – showing raw HTML.";
-
     } else {
-      chat = "⚠️ Unsupported platform. Please paste plain text instead.";
+      chat = "⚠️ Only ChatGPT share links are currently supported.";
     }
 
     await browser.close();
     res.json({ content: chat });
 
-  } catch (err) {
-    console.error("❌ Scraping failed:", err);
+  } catch (err: any) {
+    console.error("❌ Scraping failed:", err.message || err);
     res.status(500).json({ error: "❌ Failed to extract chat content." });
   }
 });
-app.get("/", (req, res) => {
-  res.send("✅ Scraper backend is running.");
-});
-
 
 app.listen(PORT, () => {
   console.log(`🚀 Scraper backend running on http://localhost:${PORT}`);
