@@ -1,103 +1,211 @@
-import Image from "next/image";
+"use client";
+import { useState } from "react";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [chatText, setChatText] = useState("");
+  const [summary, setSummary] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [summaryType, setSummaryType] = useState("brief");
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(summary);
+    alert("Copied to clipboard!");
+  };
+
+  const handleDownloadTxt = () => {
+    const blob = new Blob([summary], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "summary.txt";
+    a.click();
+  };
+
+  const handleDownloadJson = () => {
+    try {
+      const json = JSON.parse(summary);
+      const blob = new Blob([JSON.stringify(json, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "summary.json";
+      a.click();
+    } catch (err) {
+      alert("Invalid JSON. Cannot download.");
+    }
+  };
+
+//   async function extractChatFromURL(url: string): Promise<string> {
+//   const html = await fetch(url).then(res => res.text());
+
+//   if (url.includes('chat.openai.com')) {
+//     // ChatGPT
+//     const pattern = /"text":"(.*?)"/g;
+//     const matches = [...html.matchAll(pattern)];
+//     const messages = matches.map(m => m[1].replace(/\\n/g, '\n').replace(/\\"/g, '"'));
+//     return messages.join('\n\n');
+//   } else if (url.includes('poe.com')) {
+//     // Poe
+//     const pattern = /"text":"(.*?)"/g;
+//     const matches = [...html.matchAll(pattern)];
+//     const messages = matches.map(m => m[1].replace(/\\n/g, '\n').replace(/\\"/g, '"'));
+//     return messages.join('\n\n');
+//   } else if (url.includes('claude.ai')) {
+//     // Claude (Anthropic)
+//     const pattern = /"text":"(.*?)"/g;
+//     const matches = [...html.matchAll(pattern)];
+//     const messages = matches.map(m => m[1].replace(/\\n/g, '\n').replace(/\\"/g, '"'));
+//     return messages.join('\n\n');
+//   } else if (url.includes('gemini.google.com')) {
+//     // Gemini: Google formats text in <script> tags
+//     const textOnly = html
+//       .split('<script')
+//       .filter(script => script.includes('conversation'))
+//       .map(script => script.replace(/\\n/g, '\n').replace(/\\"/g, '"'))
+//       .join('\n\n');
+//     return textOnly || 'No readable chat found in Gemini.';
+//   } else {
+//     return '⚠️ This platform is not yet supported. Please paste plain text.';
+//   }
+// }
+
+
+  const handleSubmit = async () => {
+  if (!chatText.trim()) return;
+
+  setLoading(true);
+  setSummary("");
+
+  const isUrl = chatText.startsWith('http');
+  let finalChatText = chatText;
+
+  if (isUrl) {
+  try {
+    const scrapeRes = await fetch("http://127.0.0.1:3001/extract", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ url: chatText })
+    });
+
+    const scrapeData = await scrapeRes.json();
+
+    if (scrapeData.content) {
+      finalChatText = scrapeData.content;
+      setChatText(scrapeData.content); // Optional: show it in textarea
+    } else {
+      throw new Error("No content extracted");
+    }
+  } catch (error) {
+    setSummary("❌ Failed to extract chat from URL. Please check the link.");
+    setLoading(false);
+    return;
+  }
+}
+
+
+  try {
+    const res = await fetch("/api/summarize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chatText: finalChatText, summaryType }),
+    });
+
+    const data = await res.json();
+    setSummary(data.summary);
+  } catch (error) {
+    setSummary("❌ Failed to generate summary. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+  return (
+    <main className="min-h-screen bg-gray-950 text-white flex flex-col items-center justify-center px-4">
+      <div className="max-w-2xl w-full space-y-6">
+        <h1 className="text-3xl font-bold text-center">\ud83e\udde0 Contextify</h1>
+        <p className="text-center text-gray-400">
+          Extract reusable context from your AI chat conversations (ChatGPT,
+          Claude, Poe, etc.)
+        </p>
+
+        <textarea
+          value={chatText}
+          onChange={(e) => setChatText(e.target.value)}
+          placeholder="Paste your chat link or full text here..."
+          className="w-full p-4 rounded-lg bg-gray-800 border border-gray-700 text-sm text-white h-40 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+        ></textarea>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-300 mb-1">
+            Summary Type
+          </label>
+          <select
+            value={summaryType}
+            onChange={(e) => setSummaryType(e.target.value)}
+            className="w-full bg-gray-800 border border-gray-700 text-white p-2 rounded-lg focus:outline-none"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            <option value="brief">Brief</option>
+            <option value="detailed">Detailed</option>
+            <option value="bullets">Bullet Points</option>
+            <option value="json">JSON (Memory Format)</option>
+          </select>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+
+        <button
+          onClick={handleSubmit}
+          className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold text-white disabled:opacity-50"
+          disabled={loading}
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+          {loading ? "Summarizing..." : "Generate Context Summary"}
+        </button>
+
+        <div className="bg-gray-900 p-4 rounded-lg border border-gray-700 text-sm whitespace-pre-wrap">
+          <p className="text-gray-400 mb-2">\ud83d\udcdd Your Summary:</p>
+          <div className="text-white">{summary || "No summary yet."}</div>
+
+          {summary && (
+            <div className="flex gap-4 mt-4 justify-center">
+              <button
+                onClick={handleCopy}
+                className="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded text-sm text-white"
+              >
+                \ud83d\udccb Copy
+              </button>
+
+              <button
+                onClick={handleDownloadTxt}
+                className="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded text-sm text-white"
+              >
+                \ud83d\udcc4 Download TXT
+              </button>
+
+              {summaryType === "json" && (
+                <button
+                  onClick={handleDownloadJson}
+                  className="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded text-sm text-white"
+                >
+                  \ud83e\uddfe Download JSON
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <footer className="mt-10 text-center text-sm text-gray-500">
+        <hr className="border-gray-800 my-6" />
+        <p>
+          Made by <strong>Krishna Randad</strong> – Developer at Quick Add Advertising Agency
+        </p>
+        <p>
+          \ud83d\udce7 <a href="mailto:krishnaengg.work2022@gmail.com" className="hover:underline">krishnaengg.work2022@gmail.com</a> | 
+          \ud83d\udcde <a href="tel:+919422860229" className="hover:underline">+91-9422860229</a> | 
+          \ud83c\udf10 <a href="https://krishnarandad.vercel.app" target="_blank" className="hover:underline">krishnarandad.vercel.app</a>
+        </p>
       </footer>
-    </div>
+    </main>
   );
 }
