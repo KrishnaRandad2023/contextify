@@ -1,21 +1,2 @@
-# Ignore local node modules
-node_modules/
-scraper-backend/node_modules/
-
-# Ignore build outputs
-.next/
-out/
-dist/
-scraper-backend/dist/
-
-# Ignore environment config
-.env
-.env.local
-.env.*.local
-
-# Logs
-*.log
-
-# System files
-.DS_Store
-Thumbs.db
+# Ignore backend server code during Vercel build
+scraper-backend/
