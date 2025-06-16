@@ -37,7 +37,10 @@ app.post("/extract", async (req: Request, res: Response): Promise<void> => {
   }
 
   try {
-    const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({
+  headless: true,
+  args: ['--no-sandbox', '--disable-setuid-sandbox'], // ✅ This is the fix
+});
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: "networkidle" });
 
