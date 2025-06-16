@@ -1,82 +1,72 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import OpenAI from 'openai';
 
-export async function POST(req: NextRequest) {
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+export async function POST(request: Request) {
   try {
-    const { chatText, summaryType } = await req.json();
+    const { chatText, summaryType } = await request.json();
 
-    if (!chatText || !summaryType) {
-      return NextResponse.json({ summary: "❌ Missing chat text or summary type." }, { status: 400 });
+    if (!chatText || chatText.trim() === '') {
+      return NextResponse.json(
+        { summary: '❌ No chat text provided.' },
+        { status: 400 }
+      );
     }
 
-    let formatInstruction = '';
-
+    let prompt = '';
     switch (summaryType) {
       case 'brief':
-        formatInstruction = 'Summarize the conversation briefly in 2-3 lines.';
+        prompt = `Summarize this chat conversation in 2–3 sentences:\n\n${chatText}`;
         break;
       case 'detailed':
-        formatInstruction = 'Give a detailed summary covering all important points.';
+        prompt = `Write a detailed summary of the following conversation:\n\n${chatText}`;
         break;
       case 'bullets':
-        formatInstruction = 'Summarize the conversation using concise bullet points.';
+        prompt = `Summarize this conversation as bullet points:\n\n${chatText}`;
         break;
       case 'json':
-        formatInstruction = `Analyze the chat and return structured JSON summary.
-
-Instructions:
-1. Infer the context (e.g. coding, health, business).
-2. Generate appropriate keys.
-3. Respond with only valid JSON (no explanation).
-
-Example:
+        prompt = `Extract the main points of this conversation into a structured JSON format with these keys:
 {
   "mainIdea": "",
   "supportingPoints": [],
   "actionItems": []
-}`;
+}
+
+Conversation:\n\n${chatText}`;
         break;
       default:
-        formatInstruction = 'Provide a short and useful summary.';
+        prompt = `Summarize this conversation:\n\n${chatText}`;
     }
 
-    // 🧠 TRUNCATE chatText if too long (gpt-3.5 supports 16k tokens ~ approx 50k chars max)
-    const MAX_CHARS = 15000;
-    const trimmedChat = chatText.length > MAX_CHARS
-      ? chatText.slice(0, MAX_CHARS) + '\n\n⚠️ Note: input truncated due to token limit.'
-      : chatText;
-
-    const prompt = `You are an intelligent assistant. ${formatInstruction}\n\nChat:\n${trimmedChat}`;
-
-    const apiKey = process.env.OPENAI_API_KEY;
-
-    if (!apiKey) {
-      return NextResponse.json({ summary: "❌ Server error: API key missing." }, { status: 500 });
-    }
-
-    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
-      }),
+    const response = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a helpful assistant that summarizes conversations.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      temperature: 0.5,
+      max_tokens: 1200,
     });
 
-    const data = await openaiRes.json();
-
-    if (!openaiRes.ok || !data.choices?.[0]?.message?.content) {
-      console.error("OpenAI API Error:", data);
-      return NextResponse.json({ summary: "❌ Failed to generate summary from OpenAI." }, { status: 500 });
-    }
-
-    const summary = data.choices[0].message.content.trim();
+    const summary = response.choices[0]?.message?.content?.trim() || '⚠️ No summary generated.';
     return NextResponse.json({ summary });
-  } catch (err) {
-    console.error("❌ summarize error:", err);
-    return NextResponse.json({ summary: "❌ Internal error while summarizing." }, { status: 500 });
+  } catch (error: any) {
+    console.error('❌ Summarization error:', error.message);
+    return NextResponse.json(
+      { summary: '❌ Failed to generate summary. Please try again.' },
+      { status: 500 }
+    );
   }
 }
+// This code defines a Next.js API route that summarizes chat conversations using OpenAI's GPT-3.5 Turbo model.
+// It handles different summary types (brief, detailed, bullets, JSON) and returns the generated summary.   

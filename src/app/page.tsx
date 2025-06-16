@@ -7,7 +7,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [summaryType, setSummaryType] = useState("brief");
 
-  const handleCopy = async () => {
+  const handleCopy = async () => {  
     await navigator.clipboard.writeText(summary);
     alert("Copied to clipboard!");
   };
@@ -82,7 +82,8 @@ export default function Home() {
 
   if (isUrl) {
     try {
-      const scrapeRes = await fetch("https://contextify-backend.onrender.com/extract", {
+const scrapeRes = await fetch("https://contextify-backend.onrender.com/extract", {
+
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -1,6 +1,6 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
-import puppeteer from "puppeteer";
+import { chromium } from "playwright"; // ✅ Using Playwright
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -8,59 +8,64 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-app.get("/", (_req, res) => {
+// ✅ Health check
+app.get("/", (_req: Request, res: Response) => {
   res.send("✅ Scraper backend is running.");
 });
 
+// ✅ Chat extraction endpoint
 app.post("/extract", async (req: Request, res: Response): Promise<void> => {
   const { url } = req.body;
+
   console.log("📩 Received URL:", url);
 
-  if (!url || !url.startsWith("http")) {
+  // ❌ Basic validation
+  if (!url || typeof url !== "string" || !url.startsWith("http")) {
     res.status(400).json({ error: "❌ Invalid or unsupported chat link." });
     return;
   }
 
-  try {
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+  // ✅ Allow only valid ChatGPT share links
+  const isValidChatGPTLink =
+    url.includes("chat.openai.com/share/") || url.includes("chatgpt.com/share/");
+
+  if (!isValidChatGPTLink) {
+    res.status(400).json({
+      content: "⚠️ Only ChatGPT share links are currently supported.",
     });
+    return;
+  }
 
+  try {
+    const browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
-    await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
+    await page.goto(url, { waitUntil: "networkidle" });
 
-    // Wait for main content to load
+    console.log("⏳ Waiting for <main> selector...");
     await page.waitForSelector("main", { timeout: 15000 });
 
-    let chat = "";
+    const chatContent = await page.$eval("main", (el) => el.textContent?.trim() || "");
+    await browser.close();
 
-    if (url.includes("chat.openai.com")) {
-      try {
-        const mainText = await page.$eval("main", (el) => el.innerText.trim());
-
-        if (!mainText || mainText.length < 20) {
-          throw new Error("Extracted text too short or missing.");
-        }
-
-        chat = mainText;
-      } catch (err) {
-        console.error("❌ Error scraping ChatGPT shared page:", err);
-        chat = "⚠️ Could not extract content from the ChatGPT share link.";
-      }
-    } else {
-      chat = "⚠️ Only ChatGPT share links are currently supported.";
+    if (!chatContent || chatContent.length < 30) {
+      console.error("❌ Extracted content too short or empty.");
+      res.status(500).json({
+        error: "❌ Failed to extract meaningful chat content.",
+      });
+      return;
     }
 
-    await browser.close();
-    res.json({ content: chat });
-
+    console.log("✅ Chat content extracted successfully.");
+    res.json({ content: chatContent });
   } catch (err: any) {
     console.error("❌ Scraping failed:", err.message || err);
-    res.status(500).json({ error: "❌ Failed to extract chat content." });
+    res.status(500).json({
+      error: "❌ Failed to extract chat content.",
+    });
   }
 });
 
+// ✅ Start server
 app.listen(PORT, () => {
   console.log(`🚀 Scraper backend running on http://localhost:${PORT}`);
 });
